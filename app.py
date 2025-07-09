@@ -1,273 +1,236 @@
 import os
-import requests
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, send_file, jsonify, redirect
 from io import BytesIO
+import requests
 import urllib.parse
-import html
+import base64
 
 app = Flask(__name__)
+
+# Cloudinary configuration
+CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME', 'demo')  # ใส่ cloud name ของคุณ
+CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY', '')  # ถ้าต้องการ upload
+CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', '')  # ถ้าต้องการ upload
 
 @app.route('/')
 def home():
     return jsonify({
         "status": "Thai Text API ✅",
-        "info": "SVG solution with multiple Thai fonts - Perfect Thai support",
+        "info": "Using Cloudinary for real image output with Thai text support",
         "endpoints": {
-            "/text-on-image": "POST - Add Thai text to image",
+            "/text-on-image": "POST - Add Thai text to image (returns PNG/JPG)",
             "/test": "GET - Test Thai rendering",
-            "/pure-svg": "GET - Generate Thai SVG",
-            "/multi-line": "POST - Add multi-line Thai text"
+            "/cloudinary-url": "POST - Get Cloudinary URL for image with text"
         }
     })
 
 @app.route('/test')
 def test():
     """ทดสอบการแสดงผลภาษาไทย"""
+    # ใช้ Cloudinary demo account
+    base_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/fetch"
     
-    svg_content = '''<?xml version="1.0" encoding="UTF-8"?>
-<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;family=Sarabun:wght@400;700&amp;family=Kanit:wght@400;700&amp;display=swap');
-      .thai-text {
-        font-family: 'Noto Sans Thai', 'Sarabun', sans-serif;
-        font-size: 36px;
-        fill: white;
-        text-anchor: middle;
-        dominant-baseline: central;
-        font-weight: 400;
-      }
-      .thai-bold {
-        font-family: 'Noto Sans Thai', 'Sarabun', sans-serif;
-        font-size: 42px;
-        fill: #FFD700;
-        text-anchor: middle;
-        dominant-baseline: central;
-        font-weight: 700;
-      }
-    </style>
-  </defs>
-  <rect width="800" height="600" fill="#1976D2"/>
-  
-  <!-- ทดสอบสระลอยและวรรณยุกต์ -->
-  <text x="400" y="50" class="thai-bold">ทดสอบสระลอยและวรรณยุกต์</text>
-  
-  <text x="400" y="120" class="thai-text">ปี่ ฟื้น มื่อ ลิง ดิ้น</text>
-  <text x="400" y="170" class="thai-text">ตื่น ซื่อ ปืน ชื่อ อื่น</text>
-  <text x="400" y="220" class="thai-text">ที่ มี่ ปี๊ ดี๊ ลี่</text>
-  <text x="400" y="270" class="thai-text">ปู่ ตู้ หู่ ดู่ คู่</text>
-  <text x="400" y="320" class="thai-text">เป่า เล่า เก่า เร่า เท่า</text>
-  <text x="400" y="370" class="thai-text">แก้ แม้ แล้ แพ้ แค้</text>
-  <text x="400" y="420" class="thai-text">โต๊ะ โล่ โก่ โร่ โท่</text>
-  <text x="400" y="470" class="thai-text">ใต้ ใส่ ใช้ ใด้ ให้</text>
-  
-  <text x="400" y="550" style="font-family: Arial; font-size: 20px; fill: #4CAF50; text-anchor: middle;">✅ SVG with Google Fonts: Perfect Thai rendering!</text>
-</svg>'''
+    # รูปตัวอย่าง
+    sample_image = "https://picsum.photos/800/600"
     
-    return send_file(
-        BytesIO(svg_content.encode('utf-8')),
-        mimetype='image/svg+xml',
-        as_attachment=True,
-        download_name='thai_test.svg'
-    )
+    # Text overlay
+    text = "ทั้งที่ยังรัก"
+    font_family = "Noto Sans Thai"  # Cloudinary รองรับ Google Fonts
+    font_size = 60
+    
+    # สร้าง text overlay transformation
+    text_overlay = f"l_text:{font_family}_{font_size}:{urllib.parse.quote(text)},co_rgb:FFFFFF,g_center"
+    
+    # สร้าง URL สุดท้าย
+    final_url = f"{base_url}/{text_overlay}/{urllib.parse.quote(sample_image)}"
+    
+    # Download และส่งกลับเป็นไฟล์
+    response = requests.get(final_url)
+    if response.status_code == 200:
+        return send_file(
+            BytesIO(response.content),
+            mimetype='image/jpeg',
+            as_attachment=True,
+            download_name='test_thai.jpg'
+        )
+    else:
+        return jsonify({"error": "Failed to generate image"}), 500
 
 @app.route('/text-on-image', methods=['POST'])
 def add_text():
+    """เพิ่มข้อความบนรูป - ส่งกลับเป็นรูปภาพจริง (PNG/JPG)"""
     try:
         data = request.get_json()
         
         img_url = data.get('img_url')
         text = data.get('text', 'Hello')
-        x = int(data.get('x', 100))
-        y = int(data.get('y', 100))
+        x = int(data.get('x', 0))  # Cloudinary ใช้ offset จาก center
+        y = int(data.get('y', 0))
         font_size = int(data.get('font_size', 48))
-        color = data.get('font_color', '#FFFFFF')
-        align = data.get('align', 'left')  # left, center, right
-        valign = data.get('valign', 'top')  # top, middle, bottom
-        font = data.get('font', 'Noto Sans Thai')  # เพิ่มตัวเลือกฟอนต์
+        color = data.get('font_color', '#FFFFFF').replace('#', '')
+        align = data.get('align', 'center')
+        valign = data.get('valign', 'middle')
         
         if not img_url:
-            return jsonify({"error": "ต้องมี img_url"}), 400
+            return jsonify({"error": "img_url is required"}), 400
         
-        # Escape HTML entities ในข้อความ
-        text = html.escape(text)
-        
-        # จัดการ text alignment
-        text_anchor = 'start'  # default
-        if align == 'center':
-            text_anchor = 'middle'
-        elif align == 'right':
-            text_anchor = 'end'
-        
-        # จัดการ vertical alignment
-        dominant_baseline = 'hanging'  # default (top)
-        if valign == 'middle':
-            dominant_baseline = 'central'
-        elif valign == 'bottom':
-            dominant_baseline = 'alphabetic'
-        
-        # รายการฟอนต์ที่รองรับ
-        supported_fonts = {
-            'Noto Sans Thai': 'Noto+Sans+Thai:wght@400;700',
-            'Sarabun': 'Sarabun:wght@400;700',
-            'Kanit': 'Kanit:wght@400;700',
-            'Prompt': 'Prompt:wght@400;700',
-            'Mitr': 'Mitr:wght@400;700'
+        # แปลง alignment เป็น Cloudinary gravity
+        gravity_map = {
+            ('left', 'top'): 'north_west',
+            ('center', 'top'): 'north',
+            ('right', 'top'): 'north_east',
+            ('left', 'middle'): 'west',
+            ('center', 'middle'): 'center',
+            ('right', 'middle'): 'east',
+            ('left', 'bottom'): 'south_west',
+            ('center', 'bottom'): 'south',
+            ('right', 'bottom'): 'south_east'
         }
+        gravity = gravity_map.get((align, valign), 'center')
         
-        font_import = supported_fonts.get(font, supported_fonts['Noto Sans Thai'])
+        # ถ้ามีหลายบรรทัด
+        if '\n' in text:
+            # สร้าง text overlay สำหรับแต่ละบรรทัด
+            lines = text.split('\n')
+            overlays = []
+            for i, line in enumerate(lines):
+                line_y = y + (i * int(font_size * 1.2))
+                overlay = f"l_text:Noto Sans Thai_{font_size}:{urllib.parse.quote(line)},co_rgb:{color},g_{gravity},x_{x},y_{line_y}"
+                overlays.append(overlay)
+            text_overlay = '/'.join(overlays)
+        else:
+            # บรรทัดเดียว
+            text_overlay = f"l_text:Noto Sans Thai_{font_size}:{urllib.parse.quote(text)},co_rgb:{color},g_{gravity},x_{x},y_{y}"
         
-        # สร้าง SVG ที่มีรูปพื้นหลัง + ข้อความไทย
-        svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family={font_import}&amp;display=swap');
-      .thai-text {{
-        font-family: '{font}', 'Noto Sans Thai', sans-serif;
-        font-size: {font_size}px;
-        fill: {color};
-        text-anchor: {text_anchor};
-        dominant-baseline: {dominant_baseline};
-        font-weight: 400;
-      }}
-    </style>
-  </defs>
-  <image href="{img_url}" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
-  <text x="{x}" y="{y}" class="thai-text">{text}</text>
-</svg>'''
+        # สร้าง Cloudinary URL
+        base_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/fetch"
+        final_url = f"{base_url}/{text_overlay}/{urllib.parse.quote(img_url)}"
         
-        return send_file(
-            BytesIO(svg_content.encode('utf-8')),
-            mimetype='image/svg+xml',
-            as_attachment=True,
-            download_name='result.svg'
-        )
+        # Download รูปและส่งกลับ
+        response = requests.get(final_url)
+        if response.status_code == 200:
+            # ตรวจสอบ content type
+            content_type = response.headers.get('Content-Type', 'image/jpeg')
+            extension = 'jpg' if 'jpeg' in content_type else 'png'
+            
+            return send_file(
+                BytesIO(response.content),
+                mimetype=content_type,
+                as_attachment=True,
+                download_name=f'result.{extension}'
+            )
+        else:
+            return jsonify({
+                "error": "Failed to generate image",
+                "cloudinary_url": final_url,
+                "status_code": response.status_code
+            }), 500
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/multi-line', methods=['POST'])
-def add_multi_line_text():
-    """เพิ่มข้อความหลายบรรทัดบนรูป"""
+@app.route('/cloudinary-url', methods=['POST'])
+def get_cloudinary_url():
+    """สร้าง Cloudinary URL สำหรับ n8n หรือการใช้งานอื่นๆ"""
     try:
         data = request.get_json()
         
         img_url = data.get('img_url')
-        lines = data.get('lines', [])  # รับเป็น array ของข้อความ
-        x = int(data.get('x', 400))
-        y = int(data.get('y', 100))
+        text = data.get('text', 'Hello')
+        x = int(data.get('x', 0))
+        y = int(data.get('y', 0))
         font_size = int(data.get('font_size', 48))
-        line_height = int(data.get('line_height', font_size * 1.2))
-        color = data.get('font_color', '#FFFFFF')
+        color = data.get('font_color', '#FFFFFF').replace('#', '')
         align = data.get('align', 'center')
-        font = data.get('font', 'Noto Sans Thai')
+        valign = data.get('valign', 'middle')
         
         if not img_url:
-            return jsonify({"error": "ต้องมี img_url"}), 400
+            return jsonify({"error": "img_url is required"}), 400
         
-        if not lines:
-            lines = ["ข้อความบรรทัดที่ 1", "ข้อความบรรทัดที่ 2"]
-        
-        # จัดการ text alignment
-        text_anchor = 'start'
-        if align == 'center':
-            text_anchor = 'middle'
-        elif align == 'right':
-            text_anchor = 'end'
-        
-        # รายการฟอนต์ที่รองรับ
-        supported_fonts = {
-            'Noto Sans Thai': 'Noto+Sans+Thai:wght@400;700',
-            'Sarabun': 'Sarabun:wght@400;700',
-            'Kanit': 'Kanit:wght@400;700',
-            'Prompt': 'Prompt:wght@400;700',
-            'Mitr': 'Mitr:wght@400;700'
+        # แปลง alignment
+        gravity_map = {
+            ('left', 'top'): 'north_west',
+            ('center', 'top'): 'north',
+            ('right', 'top'): 'north_east',
+            ('left', 'middle'): 'west',
+            ('center', 'middle'): 'center',
+            ('right', 'middle'): 'east',
+            ('left', 'bottom'): 'south_west',
+            ('center', 'bottom'): 'south',
+            ('right', 'bottom'): 'south_east'
         }
+        gravity = gravity_map.get((align, valign), 'center')
         
-        font_import = supported_fonts.get(font, supported_fonts['Noto Sans Thai'])
+        # สร้าง text overlay
+        text_overlay = f"l_text:Noto Sans Thai_{font_size}:{urllib.parse.quote(text)},co_rgb:{color},g_{gravity},x_{x},y_{y}"
         
-        # สร้าง text elements สำหรับแต่ละบรรทัด
-        text_elements = ""
-        for i, line in enumerate(lines):
-            line_y = y + (i * line_height)
-            escaped_line = html.escape(line)
-            text_elements += f'  <text x="{x}" y="{line_y}" class="thai-text">{escaped_line}</text>\n'
+        # สร้าง URL
+        base_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/fetch"
+        final_url = f"{base_url}/{text_overlay}/{urllib.parse.quote(img_url)}"
         
-        # สร้าง SVG
-        svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family={font_import}&amp;display=swap');
-      .thai-text {{
-        font-family: '{font}', 'Noto Sans Thai', sans-serif;
-        font-size: {font_size}px;
-        fill: {color};
-        text-anchor: {text_anchor};
-        dominant-baseline: hanging;
-        font-weight: 400;
-      }}
-    </style>
-  </defs>
-  <image href="{img_url}" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
-{text_elements}</svg>'''
-        
-        return send_file(
-            BytesIO(svg_content.encode('utf-8')),
-            mimetype='image/svg+xml',
-            as_attachment=True,
-            download_name='multi_line_result.svg'
-        )
+        return jsonify({
+            "success": True,
+            "cloudinary_url": final_url,
+            "direct_download": f"{final_url}?dl=true",
+            "parameters": {
+                "text": text,
+                "position": f"{align} {valign}",
+                "offset": f"x:{x}, y:{y}",
+                "font_size": font_size,
+                "color": f"#{color}"
+            }
+        })
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/pure-svg')
-def pure_svg():
-    """สร้าง SVG ภาษาไทยอย่างเดียว"""
-    text = request.args.get('text', 'สวัสดีครับ')
-    font = request.args.get('font', 'Noto Sans Thai')
+@app.route('/upload-and-transform', methods=['POST'])
+def upload_and_transform():
+    """อัพโหลดรูปไป Cloudinary แล้วใส่ข้อความ (ต้องมี API credentials)"""
+    if not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
+        return jsonify({
+            "error": "Cloudinary API credentials not configured",
+            "info": "Please set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET environment variables"
+        }), 400
     
-    # Escape HTML entities
-    text = html.escape(text)
-    
-    # รายการฟอนต์ที่รองรับ
-    supported_fonts = {
-        'Noto Sans Thai': 'Noto+Sans+Thai:wght@400;700',
-        'Sarabun': 'Sarabun:wght@400;700',
-        'Kanit': 'Kanit:wght@400;700',
-        'Prompt': 'Prompt:wght@400;700',
-        'Mitr': 'Mitr:wght@400;700'
-    }
-    
-    font_import = supported_fonts.get(font, supported_fonts['Noto Sans Thai'])
-    
-    svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family={font_import}&amp;display=swap');
-      .thai-text {{
-        font-family: '{font}', 'Noto Sans Thai', sans-serif;
-        font-size: 48px;
-        fill: white;
-        text-anchor: middle;
-        dominant-baseline: central;
-        font-weight: 400;
-      }}
-    </style>
-  </defs>
-  <rect width="800" height="400" fill="#1976D2"/>
-  <text x="400" y="200" class="thai-text">{text}</text>
-</svg>'''
-    
-    return send_file(
-        BytesIO(svg_content.encode('utf-8')),
-        mimetype='image/svg+xml',
-        as_attachment=True,
-        download_name='thai_svg.svg'
-    )
+    try:
+        data = request.get_json()
+        img_url = data.get('img_url')
+        text = data.get('text', 'Hello')
+        
+        if not img_url:
+            return jsonify({"error": "img_url is required"}), 400
+        
+        # Upload to Cloudinary
+        upload_url = f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/image/upload"
+        
+        # สร้าง transformation
+        transformation = f"l_text:Noto Sans Thai_48:{urllib.parse.quote(text)},co_rgb:FFFFFF,g_center"
+        
+        # Upload parameters
+        params = {
+            'file': img_url,
+            'upload_preset': 'unsigned',  # ต้องสร้าง unsigned preset ใน Cloudinary dashboard
+            'transformation': transformation
+        }
+        
+        # Basic auth
+        auth = (CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET)
+        
+        response = requests.post(upload_url, data=params, auth=auth)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify({
+                "success": True,
+                "url": result['secure_url'],
+                "public_id": result['public_id']
+            })
+        else:
+            return jsonify({"error": "Upload failed", "details": response.text}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
