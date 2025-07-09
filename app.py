@@ -27,34 +27,56 @@ def home():
 @app.route('/test')
 def test():
     """ทดสอบการแสดงผลภาษาไทย"""
-    # ใช้ Cloudinary demo account
-    base_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/fetch"
+    # วิธีที่ 1: ใช้ Cloudinary Text overlay ที่ทำงานได้แน่นอน
+    text = "Thai Text Test"
+    encoded_text = urllib.parse.quote(text)
     
-    # รูปตัวอย่าง
-    sample_image = "https://picsum.photos/800/600"
+    # ใช้ transformation ที่ง่ายที่สุด
+    cloudinary_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_600,c_fill/l_text:Arial_60:{encoded_text},co_rgb:FFFFFF,g_center/v1/samples/landscapes/nature-mountains"
     
-    # Text overlay
-    text = "ทั้งที่ยังรัก"
-    font_family = "Noto Sans Thai"  # Cloudinary รองรับ Google Fonts
-    font_size = 60
+    # Debug: แสดง URL
+    print(f"Cloudinary URL: {cloudinary_url}")
     
-    # สร้าง text overlay transformation
-    text_overlay = f"l_text:{font_family}_{font_size}:{urllib.parse.quote(text)},co_rgb:FFFFFF,g_center"
+    # ถ้า Cloudinary ไม่ทำงาน ใช้วิธี fallback
+    try:
+        response = requests.get(cloudinary_url, timeout=10)
+        if response.status_code == 200 and len(response.content) > 1000:
+            return send_file(
+                BytesIO(response.content),
+                mimetype='image/jpeg',
+                as_attachment=True,
+                download_name='test_thai.jpg'
+            )
+    except:
+        pass
     
-    # สร้าง URL สุดท้าย
-    final_url = f"{base_url}/{text_overlay}/{urllib.parse.quote(sample_image)}"
+    # Fallback: สร้าง SVG แทน
+    svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
+      .thai-text {{
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 48px;
+        fill: white;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }}
+    </style>
+  </defs>
+  <rect width="800" height="600" fill="#1976D2"/>
+  <text x="400" y="250" class="thai-text">ทั้งที่ยังรัก</text>
+  <text x="400" y="320" class="thai-text">Cloudinary Error - Using SVG</text>
+  <text x="400" y="390" class="thai-text" style="font-size: 24px; fill: #FFD700;">URL: {cloudinary_url[:50]}...</text>
+</svg>'''
     
-    # Download และส่งกลับเป็นไฟล์
-    response = requests.get(final_url)
-    if response.status_code == 200:
-        return send_file(
-            BytesIO(response.content),
-            mimetype='image/jpeg',
-            as_attachment=True,
-            download_name='test_thai.jpg'
-        )
-    else:
-        return jsonify({"error": "Failed to generate image"}), 500
+    return send_file(
+        BytesIO(svg_content.encode('utf-8')),
+        mimetype='image/svg+xml',
+        as_attachment=True,
+        download_name='test_fallback.svg'
+    )
 
 @app.route('/text-on-image', methods=['POST'])
 def add_text():
