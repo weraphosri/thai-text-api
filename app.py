@@ -61,9 +61,25 @@ def add_text():
         y = int(data.get('y', 100))
         font_size = int(data.get('font_size', 48))
         color = data.get('font_color', '#FFFFFF')
+        align = data.get('align', 'left')  # left, center, right
+        valign = data.get('valign', 'top')  # top, middle, bottom
         
         if not img_url:
             return jsonify({"error": "ต้องมี img_url"}), 400
+        
+        # จัดการ text alignment
+        text_anchor = 'start'  # default
+        if align == 'center':
+            text_anchor = 'middle'
+        elif align == 'right':
+            text_anchor = 'end'
+        
+        # จัดการ vertical alignment
+        dominant_baseline = 'hanging'  # default (top)
+        if valign == 'middle':
+            dominant_baseline = 'central'
+        elif valign == 'bottom':
+            dominant_baseline = 'alphabetic'
         
         # สร้าง SVG ที่มีรูปพื้นหลัง + ข้อความไทย
         svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
@@ -75,8 +91,8 @@ def add_text():
         font-family: 'Noto Sans Thai', sans-serif;
         font-size: {font_size}px;
         fill: {color};
-        text-anchor: start;
-        dominant-baseline: hanging;
+        text-anchor: {text_anchor};
+        dominant-baseline: {dominant_baseline};
       }}
     </style>
   </defs>
