@@ -1,59 +1,39 @@
 import os
 import requests
 from flask import Flask, request, send_file, jsonify
-from PIL import Image, ImageDraw
 from io import BytesIO
 import urllib.parse
-import base64
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return jsonify({
-        "status": "Thai Text API - Google Charts Solution ✅",
-        "info": "Uses Google Charts API that actually supports Thai",
-        "test_url": "https://chart.googleapis.com/chart?cht=tx&chl=\\text{ทั้งที่ยังรัก}"
+        "status": "Thai Text API ✅",
+        "info": "SVG solution with Google Fonts - Perfect Thai support",
+        "endpoints": {
+            "/text-on-image": "POST - Add Thai text to image",
+            "/test": "GET - Test Thai rendering",
+            "/pure-svg": "GET - Generate Thai SVG"
+        }
     })
 
 @app.route('/test')
 def test():
-    """ทดสอบด้วย Google Charts LaTeX renderer"""
+    """ทดสอบการแสดงผลภาษาไทย"""
     
-    # ใช้ Google Charts TeX renderer ที่รองรับ Unicode
-    thai_text = "ทั้งที่ยังรัก ที่นี่ ยิ้ม สิ้นสุด"
-    
-    # สร้าง LaTeX formula
-    latex_formula = f"\\large\\text{{{thai_text}}}"
-    
-    # Google Charts TeX API
-    chart_url = f"https://chart.googleapis.com/chart?cht=tx&chl={urllib.parse.quote(latex_formula)}"
-    
-    try:
-        response = requests.get(chart_url, timeout=10)
-        if response.status_code == 200:
-            return send_file(
-                BytesIO(response.content),
-                mimetype='image/png',
-                as_attachment=True,
-                download_name='thai_test.png'
-            )
-    except:
-        pass
-    
-    # Fallback - สร้าง SVG เอง
-    svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+    svg_content = '''<?xml version="1.0" encoding="UTF-8"?>
 <svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
-      .thai-text {{
+      .thai-text {
         font-family: 'Noto Sans Thai', sans-serif;
         font-size: 36px;
         fill: white;
         text-anchor: middle;
         dominant-baseline: central;
-      }}
+      }
     </style>
   </defs>
   <rect width="800" height="400" fill="#1976D2"/>
@@ -77,15 +57,15 @@ def add_text():
         
         img_url = data.get('img_url')
         text = data.get('text', 'Hello')
-        x = int(data.get('x', 400))
-        y = int(data.get('y', 200))
-        font_size = int(data.get('font_size', 36))
+        x = int(data.get('x', 100))
+        y = int(data.get('y', 100))
+        font_size = int(data.get('font_size', 48))
         color = data.get('font_color', '#FFFFFF')
         
         if not img_url:
             return jsonify({"error": "ต้องมี img_url"}), 400
         
-        # สร้าง SVG overlay
+        # สร้าง SVG ที่มีรูปพื้นหลัง + ข้อความไทย
         svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <defs>
@@ -116,7 +96,7 @@ def add_text():
 
 @app.route('/pure-svg')
 def pure_svg():
-    """สร้าง SVG ที่รองรับภาษาไทยแน่นอน"""
+    """สร้าง SVG ภาษาไทยอย่างเดียว"""
     text = request.args.get('text', 'สวัสดีครับ')
     
     svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
@@ -135,7 +115,6 @@ def pure_svg():
   </defs>
   <rect width="800" height="400" fill="#1976D2"/>
   <text x="400" y="200" class="thai-text">{text}</text>
-  <text x="400" y="350" style="font-family: Arial; font-size: 16px; fill: #4CAF50; text-anchor: middle;">✅ SVG with Google Fonts - 100% Thai support</text>
 </svg>'''
     
     return send_file(
@@ -143,43 +122,6 @@ def pure_svg():
         mimetype='image/svg+xml',
         as_attachment=True,
         download_name='thai_svg.svg'
-    )
-
-@app.route('/html-canvas')
-def html_canvas():
-    """สร้าง HTML Canvas ที่รองรับภาษาไทย"""
-    text = request.args.get('text', 'ทั้งที่ยังรัก')
-    
-    html_content = f'''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        body {{ margin: 0; padding: 20px; font-family: 'Noto Sans Thai', sans-serif; }}
-        .thai-text {{ 
-            font-size: 48px; 
-            color: white; 
-            background: #1976D2; 
-            padding: 50px; 
-            text-align: center;
-            border-radius: 10px;
-            display: inline-block;
-            margin: 20px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="thai-text">{text}</div>
-    <p>✅ HTML with Google Fonts - Perfect Thai rendering!</p>
-</body>
-</html>'''
-    
-    return send_file(
-        BytesIO(html_content.encode('utf-8')),
-        mimetype='text/html',
-        as_attachment=True,
-        download_name='thai_html.html'
     )
 
 if __name__ == '__main__':
