@@ -126,13 +126,9 @@ def test():
     
     y_pos = 50
     for original, transliterated in test_pairs:
-        # แสดงข้อความต้นฉบับ (อาจเป็นสี่เหลี่ยม)
-        draw.text((50, y_pos), f"Original: {original}", font=small_font, fill='#FFEB3B')
-        y_pos += 30
-        
-        # แสดงข้อความที่แปลงแล้ว
-        draw.text((50, y_pos), f"Display: {transliterated}", font=font, fill='white')
-        y_pos += 60
+        # แสดงเฉพาะข้อความที่แปลงแล้ว
+        draw.text((50, y_pos), transliterated, font=font, fill='white')
+        y_pos += 70
     
     # คำอธิบาย
     draw.text((50, 420), "✅ Thai text converted to readable Latin characters", 
