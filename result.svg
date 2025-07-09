@@ -12,6 +12,6 @@
       }
     </style>
   </defs>
-  <image href="https://picsum.photos/800/600" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
-  <text x="100" y="100" class="thai-text">ทั้งที่ยังรัก</text>
+  <image href="https://example.com/image.jpg" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
+  <text x="100" y="100" class="thai-text">ข้อความไทย</text>
 </svg>
