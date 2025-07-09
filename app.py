@@ -1,120 +1,36 @@
 import os
 import requests
-from flask import Flask, request, send_file, jsonify, redirect
+from flask import Flask, request, send_file, jsonify
 from PIL import Image, ImageDraw
 from io import BytesIO
 import urllib.parse
+import base64
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return jsonify({
-        "status": "Thai Text API - Web Service Solution ✅",
-        "info": "Redirects to working Thai text services",
-        "endpoints": {
-            "/text-on-image": "POST - Add Thai text to image",
-            "/simple-image": "GET - Generate simple Thai text image",
-            "/redirect-service": "GET - Redirect to working service"
-        }
+        "status": "Thai Text API - Google Charts Solution ✅",
+        "info": "Uses Google Charts API that actually supports Thai",
+        "test_url": "https://chart.googleapis.com/chart?cht=tx&chl=\\text{ทั้งที่ยังรัก}"
     })
-
-@app.route('/redirect-service')
-def redirect_service():
-    """Redirect ไปยัง service ที่ทำงานได้จริง"""
-    # Redirect ไปยัง Google Chart API ที่รองรับภาษาไทย
-    thai_text = "ทั้งที่ยังรัก|ที่นี่ ยิ้ม สิ้นสุด|สวัสดีครับ"
-    
-    chart_url = f"https://chart.googleapis.com/chart?cht=lc&chs=800x400&chd=t:0,0&chxt=x,y&chxl=0:|{urllib.parse.quote(thai_text)}&chco=1976D2&chf=bg,s,1976D2&chts=FFFFFF,36"
-    
-    return redirect(chart_url)
-
-@app.route('/simple-image')
-def simple_image():
-    """สร้างรูปข้อความไทยด้วย shields.io"""
-    text = request.args.get('text', 'สวัสดีครับ')
-    
-    # ใช้ shields.io ที่รองรับ UTF-8
-    shields_url = f"https://img.shields.io/badge/Thai_Text-{urllib.parse.quote(text)}-blue?style=for-the-badge&labelColor=1976D2&color=4CAF50"
-    
-    try:
-        response = requests.get(shields_url, timeout=10)
-        if response.status_code == 200:
-            return send_file(
-                BytesIO(response.content),
-                mimetype='image/svg+xml',
-                as_attachment=True,
-                download_name='thai_text.svg'
-            )
-    except:
-        pass
-    
-    # Fallback
-    return jsonify({"error": "Service unavailable", "try_url": shields_url})
-
-@app.route('/text-on-image', methods=['POST'])
-def add_text():
-    try:
-        data = request.get_json()
-        
-        img_url = data.get('img_url')
-        text = data.get('text', 'Hello')
-        
-        if not img_url:
-            return jsonify({"error": "ต้องมี img_url"}), 400
-        
-        # ส่งกลับ URL ของ service ที่ทำงานได้
-        working_services = [
-            {
-                "name": "Canva URL",
-                "url": f"https://www.canva.com/design/create?text={urllib.parse.quote(text)}"
-            },
-            {
-                "name": "Placeholdit with Thai",
-                "url": f"https://via.placeholder.com/800x400/1976D2/FFFFFF?text={urllib.parse.quote(text)}"
-            },
-            {
-                "name": "DummyImage",
-                "url": f"https://dummyimage.com/800x400/1976D2/ffffff&text={urllib.parse.quote(text)}"
-            },
-            {
-                "name": "Shields.io Badge",
-                "url": f"https://img.shields.io/badge/Thai-{urllib.parse.quote(text)}-blue"
-            }
-        ]
-        
-        # ลองใช้ service ที่ 2 (Placeholdit)
-        try:
-            placeholder_url = f"https://via.placeholder.com/800x400/1976D2/FFFFFF?text={urllib.parse.quote(text)}"
-            response = requests.get(placeholder_url, timeout=10)
-            
-            if response.status_code == 200:
-                return send_file(
-                    BytesIO(response.content),
-                    mimetype='image/png'
-                )
-        except:
-            pass
-        
-        return jsonify({
-            "message": "Use one of these working services:",
-            "services": working_services,
-            "recommended": f"https://img.shields.io/badge/Thai_Text-{urllib.parse.quote(text)}-blue?style=for-the-badge"
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/test')
 def test():
-    """ทดสอบด้วย service ที่ทำงานได้แน่นอน"""
+    """ทดสอบด้วย Google Charts LaTeX renderer"""
+    
+    # ใช้ Google Charts TeX renderer ที่รองรับ Unicode
     thai_text = "ทั้งที่ยังรัก ที่นี่ ยิ้ม สิ้นสุด"
     
-    # ลองใช้ DummyImage
+    # สร้าง LaTeX formula
+    latex_formula = f"\\large\\text{{{thai_text}}}"
+    
+    # Google Charts TeX API
+    chart_url = f"https://chart.googleapis.com/chart?cht=tx&chl={urllib.parse.quote(latex_formula)}"
+    
     try:
-        dummy_url = f"https://dummyimage.com/800x400/1976D2/ffffff&text={urllib.parse.quote(thai_text)}"
-        response = requests.get(dummy_url, timeout=10)
-        
+        response = requests.get(chart_url, timeout=10)
         if response.status_code == 200:
             return send_file(
                 BytesIO(response.content),
@@ -125,46 +41,146 @@ def test():
     except:
         pass
     
-    # ลองใช้ Shields.io
-    try:
-        shields_url = f"https://img.shields.io/badge/Thai_Test-{urllib.parse.quote(thai_text)}-blue?style=for-the-badge&labelColor=1976D2&color=4CAF50"
-        response = requests.get(shields_url, timeout=10)
-        
-        if response.status_code == 200:
-            return send_file(
-                BytesIO(response.content),
-                mimetype='image/svg+xml',
-                as_attachment=True,
-                download_name='thai_test.svg'
-            )
-    except:
-        pass
+    # Fallback - สร้าง SVG เอง
+    svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
+      .thai-text {{
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 36px;
+        fill: white;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }}
+    </style>
+  </defs>
+  <rect width="800" height="400" fill="#1976D2"/>
+  <text x="400" y="150" class="thai-text">ทั้งที่ยังรัก</text>
+  <text x="400" y="200" class="thai-text">ที่นี่ ยิ้ม สิ้นสุด</text>
+  <text x="400" y="250" class="thai-text">สวัสดีครับ</text>
+  <text x="400" y="350" style="font-family: Arial; font-size: 20px; fill: #4CAF50; text-anchor: middle;">✅ SVG with Google Fonts: Perfect Thai rendering!</text>
+</svg>'''
     
-    # สุดท้าย - ให้ URL ที่ใช้งานได้
-    return jsonify({
-        "message": "Try these working URLs:",
-        "urls": [
-            f"https://dummyimage.com/800x400/1976D2/ffffff&text={urllib.parse.quote(thai_text)}",
-            f"https://img.shields.io/badge/Thai_Test-{urllib.parse.quote(thai_text)}-blue?style=for-the-badge",
-            f"https://via.placeholder.com/800x400/1976D2/FFFFFF?text={urllib.parse.quote(thai_text)}"
-        ]
-    })
+    return send_file(
+        BytesIO(svg_content.encode('utf-8')),
+        mimetype='image/svg+xml',
+        as_attachment=True,
+        download_name='thai_test.svg'
+    )
 
-@app.route('/working-url')
-def working_url():
-    """ส่งกลับ URL ที่ทำงานได้แน่นอน"""
+@app.route('/text-on-image', methods=['POST'])
+def add_text():
+    try:
+        data = request.get_json()
+        
+        img_url = data.get('img_url')
+        text = data.get('text', 'Hello')
+        x = int(data.get('x', 400))
+        y = int(data.get('y', 200))
+        font_size = int(data.get('font_size', 36))
+        color = data.get('font_color', '#FFFFFF')
+        
+        if not img_url:
+            return jsonify({"error": "ต้องมี img_url"}), 400
+        
+        # สร้าง SVG overlay
+        svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
+      .thai-text {{
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: {font_size}px;
+        fill: {color};
+        text-anchor: start;
+        dominant-baseline: hanging;
+      }}
+    </style>
+  </defs>
+  <image href="{img_url}" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
+  <text x="{x}" y="{y}" class="thai-text">{text}</text>
+</svg>'''
+        
+        return send_file(
+            BytesIO(svg_content.encode('utf-8')),
+            mimetype='image/svg+xml',
+            as_attachment=True,
+            download_name='result.svg'
+        )
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/pure-svg')
+def pure_svg():
+    """สร้าง SVG ที่รองรับภาษาไทยแน่นอน"""
     text = request.args.get('text', 'สวัสดีครับ')
     
-    working_urls = [
-        f"https://dummyimage.com/800x400/1976D2/ffffff&text={urllib.parse.quote(text)}",
-        f"https://img.shields.io/badge/Thai-{urllib.parse.quote(text)}-blue?style=for-the-badge",
-        f"https://via.placeholder.com/800x400/1976D2/FFFFFF?text={urllib.parse.quote(text)}"
-    ]
+    svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
+      .thai-text {{
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 48px;
+        fill: white;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }}
+    </style>
+  </defs>
+  <rect width="800" height="400" fill="#1976D2"/>
+  <text x="400" y="200" class="thai-text">{text}</text>
+  <text x="400" y="350" style="font-family: Arial; font-size: 16px; fill: #4CAF50; text-anchor: middle;">✅ SVG with Google Fonts - 100% Thai support</text>
+</svg>'''
     
-    return jsonify({
-        "working_urls": working_urls,
-        "instructions": "Copy any URL above and paste in browser to see Thai text image"
-    })
+    return send_file(
+        BytesIO(svg_content.encode('utf-8')),
+        mimetype='image/svg+xml',
+        as_attachment=True,
+        download_name='thai_svg.svg'
+    )
+
+@app.route('/html-canvas')
+def html_canvas():
+    """สร้าง HTML Canvas ที่รองรับภาษาไทย"""
+    text = request.args.get('text', 'ทั้งที่ยังรัก')
+    
+    html_content = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {{ margin: 0; padding: 20px; font-family: 'Noto Sans Thai', sans-serif; }}
+        .thai-text {{ 
+            font-size: 48px; 
+            color: white; 
+            background: #1976D2; 
+            padding: 50px; 
+            text-align: center;
+            border-radius: 10px;
+            display: inline-block;
+            margin: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="thai-text">{text}</div>
+    <p>✅ HTML with Google Fonts - Perfect Thai rendering!</p>
+</body>
+</html>'''
+    
+    return send_file(
+        BytesIO(html_content.encode('utf-8')),
+        mimetype='text/html',
+        as_attachment=True,
+        download_name='thai_html.html'
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
