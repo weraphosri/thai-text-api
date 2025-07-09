@@ -374,6 +374,13 @@ def get_html():
         vertical_align = valign
         
         # สร้าง HTML ที่สมบูรณ์
+        # จัดการข้อความหลายบรรทัด
+        lines = text.split('\n') if '\n' in text else [text]
+        text_html = ''
+        for i, line in enumerate(lines):
+            line_y = y + (i * int(font_size * 1.2))
+            text_html += f'<div class="text-line" style="position: absolute; left: {x}px; top: {line_y}px;">{line}</div>'
+        
         html = f'''<!DOCTYPE html>
 <html>
 <head>
@@ -401,30 +408,18 @@ def get_html():
             background-position: center;
             background-repeat: no-repeat;
         }}
-        .text {{
-            position: absolute;
-            left: {x}px;
-            top: {y}px;
+        .text-line {{
             color: {color};
             font-size: {font_size}px;
             font-weight: 400;
             text-align: {text_align};
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-            white-space: pre-wrap;
-        }}
-        .text.middle {{
-            transform: translateY(-50%);
-            top: {y}px;
-        }}
-        .text.bottom {{
-            transform: translateY(-100%);
-            top: {y}px;
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="text {valign}">{text}</div>
+        {text_html}
     </div>
 </body>
 </html>'''
