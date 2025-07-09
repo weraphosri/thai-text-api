@@ -6,47 +6,25 @@ from io import BytesIO
 
 app = Flask(__name__)
 
-def download_thai_font():
-    """ดาวน์โหลดฟอนต์ไทยถ้าไม่มี"""
-    font_dir = "/tmp/fonts"
-    font_path = os.path.join(font_dir, "NotoSansThai-Regular.ttf")
-    
-    # สร้างโฟลเดอร์ถ้าไม่มี
-    os.makedirs(font_dir, exist_ok=True)
-    
-    if not os.path.exists(font_path):
-        try:
-            # ดาวน์โหลดฟอนต์จาก Google Fonts
-            font_url = "https://github.com/google/fonts/raw/main/ofl/notosansthai/NotoSansThai-Regular.ttf"
-            
-            print("Downloading Thai font...")
-            response = requests.get(font_url, timeout=30)
-            response.raise_for_status()
-            
-            with open(font_path, 'wb') as f:
-                f.write(response.content)
-            
-            print(f"Font downloaded: {font_path}")
-            return font_path
-            
-        except Exception as e:
-            print(f"Failed to download font: {e}")
-            return None
-    
-    return font_path
-
 def get_font(size=48):
     """หาฟอนต์ไทยที่ดีที่สุด"""
-    # ลองดาวน์โหลดฟอนต์ไทยก่อน
-    downloaded_font = download_thai_font()
-    if downloaded_font and os.path.exists(downloaded_font):
-        try:
-            return ImageFont.truetype(downloaded_font, size)
-        except Exception as e:
-            print(f"Failed to load downloaded font: {e}")
+    # ลองใช้ฟอนต์ที่อยู่ในโปรเจคก่อน
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_fonts = [
+        os.path.join(base_dir, 'fonts', 'NotoSansThai-Bold.ttf'),
+        os.path.join(base_dir, 'fonts', 'NotoSansThai-Regular.ttf'),
+    ]
+    
+    for font_path in project_fonts:
+        if os.path.exists(font_path):
+            try:
+                print(f"Using project font: {font_path}")
+                return ImageFont.truetype(font_path, size)
+            except Exception as e:
+                print(f"Failed to load project font {font_path}: {e}")
     
     # ลองหาฟอนต์ในระบบ
-    font_paths = [
+    system_fonts = [
         '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf',
         '/usr/share/fonts/truetype/thai-tlwg/Garuda.ttf',
@@ -54,19 +32,17 @@ def get_font(size=48):
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
     ]
     
-    for font_path in font_paths:
+    for font_path in system_fonts:
         if os.path.exists(font_path):
             try:
+                print(f"Using system font: {font_path}")
                 return ImageFont.truetype(font_path, size)
             except Exception as e:
-                print(f"Failed to load {font_path}: {e}")
-                continue
+                print(f"Failed to load system font {font_path}: {e}")
     
     # ใช้ default font
-    try:
-        return ImageFont.load_default()
-    except:
-        return ImageFont.load_default()
+    print("Using default font")
+    return ImageFont.load_default()
 
 def check_raqm_support():
     """ตรวจสอบว่า PIL มี RAQM support หรือไม่"""
