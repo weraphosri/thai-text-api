@@ -1,21 +1,22 @@
 import os
 from flask import Flask, request, send_file, jsonify
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, features
 import requests
 from io import BytesIO
 
 app = Flask(__name__)
 
+def check_raqm_support():
+    """ตรวจสอบว่า PIL มี RAQM support หรือไม่"""
+    return features.check_feature('raqm')
+
 def get_font(size=48):
-    """หาฟอนต์ NotoSansThai หรือฟอนต์ไทยที่เหมาะสม"""
+    """หาฟอนต์ที่รองรับภาษาไทย"""
     font_paths = [
-        # ฟอนต์ที่คุณต้องการ
         '/usr/share/fonts/truetype/noto/NotoSansThai_ExtraCondensed-SemiBold.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansThai-SemiBold.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
-        
-        # ฟอนต์สำรอง
         '/usr/share/fonts/truetype/thai-tlwg/Garuda-Bold.ttf',
         '/usr/share/fonts/truetype/thai-tlwg/Garuda.ttf',
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
@@ -28,32 +29,61 @@ def get_font(size=48):
             except:
                 continue
     
-    # ใช้ default ถ้าหาไม่เจอ
     return ImageFont.load_default()
 
 @app.route('/')
 def home():
+    raqm_status = "✅ RAQM supported" if check_raqm_support() else "❌ RAQM not supported"
     return jsonify({
         "status": "Thai Text API ✅",
-        "usage": "POST /text-on-image with JSON body"
+        "raqm_support": raqm_status,
+        "info": "RAQM required for proper Thai text rendering"
     })
 
 @app.route('/test')
 def test():
-    """ทดสอบรูปง่ายๆ"""
-    img = Image.new('RGB', (600, 300), '#4CAF50')
+    """ทดสอบ Thai text shaping"""
+    img = Image.new('RGB', (800, 400), '#2E7D32')
     draw = ImageDraw.Draw(img)
     
-    font = get_font(32)
-    text = "ทดสอบ NotoSansThai\nHello World 123"
+    # ข้อความทดสอบที่มีปัญหาสระลอย
+    test_text = "ทั้งที่ยังรัก\nที่นี่ ยิ้ม สิ้นสุด\nสวัสดีครับ"
+    font = get_font(36)
     
-    y_pos = 50
-    for line in text.split('\n'):
-        draw.text((50, y_pos), line, font=font, fill='white')
-        y_pos += 50
+    # ตรวจสอบ RAQM support
+    if check_raqm_support():
+        # ใช้ RAQM สำหรับ complex text shaping
+        lines = test_text.split('\n')
+        y_pos = 50
+        for line in lines:
+            draw.text(
+                (50, y_pos), 
+                line, 
+                font=font, 
+                fill='white',
+                language='th',  # บอก language เป็นภาษาไทย
+                direction='ltr'  # left-to-right
+            )
+            y_pos += 60
+        
+        # เพิ่มข้อความแสดงสถานะ
+        status_font = get_font(20)
+        draw.text((50, 320), "✅ RAQM: Thai text shaped correctly", 
+                 font=status_font, fill='#FFEB3B')
+    else:
+        # ถ้าไม่มี RAQM ให้แสดงคำเตือน
+        lines = test_text.split('\n')
+        y_pos = 50
+        for line in lines:
+            draw.text((50, y_pos), line, font=font, fill='white')
+            y_pos += 60
+        
+        status_font = get_font(20)
+        draw.text((50, 320), "❌ No RAQM: May have sara loy issues", 
+                 font=status_font, fill='#F44336')
     
     img_io = BytesIO()
-    img.save(img_io, 'JPEG', quality=85)
+    img.save(img_io, 'JPEG', quality=90)
     img_io.seek(0)
     return send_file(img_io, mimetype='image/jpeg')
 
@@ -82,12 +112,26 @@ def add_text():
         
         # เพิ่มข้อความ
         lines = text.split('\n')
-        for i, line in enumerate(lines):
-            draw.text((x, y + i * (font_size + 5)), line, font=font, fill=color)
+        
+        if check_raqm_support():
+            # ใช้ RAQM สำหรับ proper Thai text shaping
+            for i, line in enumerate(lines):
+                draw.text(
+                    (x, y + i * (font_size + 5)), 
+                    line, 
+                    font=font, 
+                    fill=color,
+                    language='th',  # ระบุเป็นภาษาไทย
+                    direction='ltr'
+                )
+        else:
+            # fallback สำหรับ non-RAQM
+            for i, line in enumerate(lines):
+                draw.text((x, y + i * (font_size + 5)), line, font=font, fill=color)
         
         # ส่งรูปกลับ
         img_io = BytesIO()
-        img.save(img_io, 'JPEG', quality=85)
+        img.save(img_io, 'JPEG', quality=90)
         img_io.seek(0)
         
         return send_file(img_io, mimetype='image/jpeg')
