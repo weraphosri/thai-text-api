@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
+      .thai-text {
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 36px;
+        fill: white;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }
+    </style>
+  </defs>
+  <rect width="800" height="400" fill="#1976D2"/>
+  <text x="400" y="150" class="thai-text">ทั้งที่ยังรัก</text>
+  <text x="400" y="200" class="thai-text">ที่นี่ ยิ้ม สิ้นสุด</text>
+  <text x="400" y="250" class="thai-text">สวัสดีครับ</text>
+  <text x="400" y="350" style="font-family: Arial; font-size: 20px; fill: #4CAF50; text-anchor: middle;">✅ SVG with Google Fonts: Perfect Thai rendering!</text>
+</svg>

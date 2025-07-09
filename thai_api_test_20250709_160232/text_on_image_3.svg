@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
+      .thai-text {
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 42px;
+        fill: #FF5722;
+        text-anchor: start;
+        dominant-baseline: hanging;
+      }
+    </style>
+  </defs>
+  <image href="https://picsum.photos/800/600?random=3" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
+  <text x="200" y="300" class="thai-text">ภาษาไทย Unicode ✅</text>
+</svg>
