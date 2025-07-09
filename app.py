@@ -3,254 +3,248 @@ from flask import Flask, request, send_file, jsonify, redirect
 from io import BytesIO
 import requests
 import urllib.parse
-import base64
+import json
 
 app = Flask(__name__)
-
-# Cloudinary configuration
-CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME', 'dtuz1nors')
-CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY', '992211531151382')
-CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', 'gRAksjdUhdLW_LIjgYBeZNwtPd4')
 
 @app.route('/')
 def home():
     return jsonify({
         "status": "Thai Text API ✅",
-        "info": "Using Cloudinary for real image output with Thai text support",
+        "info": "Simple working solution for Thai text on images",
         "endpoints": {
-            "/text-on-image": "POST - Add Thai text to image (returns PNG/JPG)",
+            "/text-on-image": "POST - Add Thai text to image",
             "/test": "GET - Test Thai rendering",
-            "/cloudinary-url": "POST - Get Cloudinary URL for image with text"
+            "/simple": "GET - Simple text image"
         }
     })
 
 @app.route('/test')
 def test():
     """ทดสอบการแสดงผลภาษาไทย"""
-    # วิธีที่ 1: ใช้ Cloudinary Text overlay ที่ทำงานได้แน่นอน
-    text = "Thai Text Test"
-    encoded_text = urllib.parse.quote(text)
+    # ใช้ QuickChart.io ที่รองรับภาษาไทยและ Unicode
+    text = "ทั้งที่ยังรัก"
     
-    # ใช้ transformation ที่ง่ายที่สุด
-    cloudinary_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_600,c_fill/l_text:Arial_60:{encoded_text},co_rgb:FFFFFF,g_center/v1/samples/landscapes/nature-mountains"
+    chart_config = {
+        "chart": {
+            "type": "radialGauge",
+            "data": {
+                "datasets": [{
+                    "data": [0],
+                    "backgroundColor": "transparent"
+                }]
+            },
+            "options": {
+                "centerArea": {
+                    "text": text,
+                    "fontSize": 48,
+                    "fontColor": "#FFFFFF",
+                    "fontFamily": "Noto Sans Thai"
+                },
+                "backgroundColor": "#1976D2"
+            }
+        },
+        "width": 800,
+        "height": 600
+    }
     
-    # Debug: แสดง URL
-    print(f"Cloudinary URL: {cloudinary_url}")
+    # URL encode the config
+    encoded_config = urllib.parse.quote(json.dumps(chart_config))
+    quickchart_url = f"https://quickchart.io/chart?c={encoded_config}"
     
-    # ถ้า Cloudinary ไม่ทำงาน ใช้วิธี fallback
+    # Fallback to simple method
+    # ใช้ placeholder service ที่รองรับ Unicode
+    simple_url = f"https://via.placeholder.com/800x600/1976D2/FFFFFF?text={urllib.parse.quote(text)}"
+    
+    # ลองดึงรูปจาก placeholder ก่อน
     try:
-        response = requests.get(cloudinary_url, timeout=10)
+        response = requests.get(simple_url, timeout=10)
         if response.status_code == 200 and len(response.content) > 1000:
             return send_file(
                 BytesIO(response.content),
-                mimetype='image/jpeg',
+                mimetype='image/png',
                 as_attachment=True,
-                download_name='test_thai.jpg'
+                download_name='test_thai.png'
             )
     except:
         pass
     
-    # Fallback: สร้าง SVG แทน
-    svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+    # ถ้าไม่ได้ ใช้ QuickChart
+    return redirect(quickchart_url)
+
+@app.route('/simple')
+def simple():
+    """สร้างรูปง่ายๆ พร้อมข้อความ"""
+    text = request.args.get('text', 'สวัสดี')
+    bg = request.args.get('bg', '1976D2')
+    color = request.args.get('color', 'FFFFFF')
+    
+    # ใช้ dummyimage.com
+    url = f"https://dummyimage.com/800x600/{bg}/{color}.png&text={urllib.parse.quote(text)}"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return send_file(
+                BytesIO(response.content),
+                mimetype='image/png',
+                as_attachment=True,
+                download_name='simple.png'
+            )
+    except:
+        pass
+    
+    # Fallback
+    return redirect(url)
+
+@app.route('/text-on-image', methods=['POST'])
+def add_text():
+    """เพิ่มข้อความบนรูป"""
+    try:
+        data = request.get_json()
+        
+        img_url = data.get('img_url')
+        text = data.get('text', 'Hello')
+        x = int(data.get('x', 100))
+        y = int(data.get('y', 100))
+        font_size = int(data.get('font_size', 48))
+        color = data.get('font_color', '#FFFFFF')
+        align = data.get('align', 'left')
+        valign = data.get('valign', 'top')
+        
+        if not img_url:
+            return jsonify({"error": "img_url is required"}), 400
+        
+        # วิธีที่ 1: ใช้ Statically.io (Free CDN with image manipulation)
+        # รองรับ text overlay แต่ภาษาไทยอาจมีปัญหา
+        statically_url = f"https://cdn.statically.io/img/{img_url.replace('https://', '').replace('http://', '')}/w=800,h=600"
+        
+        # วิธีที่ 2: สร้าง HTML และแปลงเป็นรูป
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+            <style>
+                body {{
+                    margin: 0;
+                    padding: 0;
+                    width: 800px;
+                    height: 600px;
+                    position: relative;
+                    overflow: hidden;
+                }}
+                .container {{
+                    width: 100%;
+                    height: 100%;
+                    position: relative;
+                    background-image: url('{img_url}');
+                    background-size: cover;
+                    background-position: center;
+                }}
+                .text {{
+                    position: absolute;
+                    left: {x}px;
+                    top: {y}px;
+                    color: {color};
+                    font-size: {font_size}px;
+                    font-family: 'Noto Sans Thai', sans-serif;
+                    text-align: {align};
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="text">{text}</div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # วิธีที่ 3: ใช้ API ที่ทำงานได้แน่นอน - กลับไปใช้ SVG
+        svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <defs>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
       .thai-text {{
         font-family: 'Noto Sans Thai', sans-serif;
-        font-size: 48px;
-        fill: white;
-        text-anchor: middle;
-        dominant-baseline: central;
+        font-size: {font_size}px;
+        fill: {color};
+        text-anchor: {'middle' if align == 'center' else 'start'};
+        dominant-baseline: {'central' if valign == 'middle' else 'hanging'};
       }}
     </style>
   </defs>
-  <rect width="800" height="600" fill="#1976D2"/>
-  <text x="400" y="250" class="thai-text">ทั้งที่ยังรัก</text>
-  <text x="400" y="320" class="thai-text">Cloudinary Error - Using SVG</text>
-  <text x="400" y="390" class="thai-text" style="font-size: 24px; fill: #FFD700;">URL: {cloudinary_url[:50]}...</text>
+  <image href="{img_url}" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
+  <text x="{x}" y="{y}" class="thai-text">{text}</text>
 </svg>'''
-    
-    return send_file(
-        BytesIO(svg_content.encode('utf-8')),
-        mimetype='image/svg+xml',
-        as_attachment=True,
-        download_name='test_fallback.svg'
-    )
-
-@app.route('/text-on-image', methods=['POST'])
-def add_text():
-    """เพิ่มข้อความบนรูป - ส่งกลับเป็นรูปภาพจริง (PNG/JPG)"""
-    try:
-        data = request.get_json()
         
-        img_url = data.get('img_url')
-        text = data.get('text', 'Hello')
-        x = int(data.get('x', 0))  # Cloudinary ใช้ offset จาก center
-        y = int(data.get('y', 0))
-        font_size = int(data.get('font_size', 48))
-        color = data.get('font_color', '#FFFFFF').replace('#', '')
-        align = data.get('align', 'center')
-        valign = data.get('valign', 'middle')
-        
-        if not img_url:
-            return jsonify({"error": "img_url is required"}), 400
-        
-        # แปลง alignment เป็น Cloudinary gravity
-        gravity_map = {
-            ('left', 'top'): 'north_west',
-            ('center', 'top'): 'north',
-            ('right', 'top'): 'north_east',
-            ('left', 'middle'): 'west',
-            ('center', 'middle'): 'center',
-            ('right', 'middle'): 'east',
-            ('left', 'bottom'): 'south_west',
-            ('center', 'bottom'): 'south',
-            ('right', 'bottom'): 'south_east'
-        }
-        gravity = gravity_map.get((align, valign), 'center')
-        
-        # ถ้ามีหลายบรรทัด
-        if '\n' in text:
-            # สร้าง text overlay สำหรับแต่ละบรรทัด
-            lines = text.split('\n')
-            overlays = []
-            for i, line in enumerate(lines):
-                line_y = y + (i * int(font_size * 1.2))
-                overlay = f"l_text:Noto Sans Thai_{font_size}:{urllib.parse.quote(line)},co_rgb:{color},g_{gravity},x_{x},y_{line_y}"
-                overlays.append(overlay)
-            text_overlay = '/'.join(overlays)
-        else:
-            # บรรทัดเดียว
-            text_overlay = f"l_text:Noto Sans Thai_{font_size}:{urllib.parse.quote(text)},co_rgb:{color},g_{gravity},x_{x},y_{y}"
-        
-        # สร้าง Cloudinary URL
-        base_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/fetch"
-        final_url = f"{base_url}/{text_overlay}/{urllib.parse.quote(img_url)}"
-        
-        # Download รูปและส่งกลับ
-        response = requests.get(final_url)
-        if response.status_code == 200:
-            # ตรวจสอบ content type
-            content_type = response.headers.get('Content-Type', 'image/jpeg')
-            extension = 'jpg' if 'jpeg' in content_type else 'png'
-            
-            return send_file(
-                BytesIO(response.content),
-                mimetype=content_type,
-                as_attachment=True,
-                download_name=f'result.{extension}'
-            )
-        else:
-            return jsonify({
-                "error": "Failed to generate image",
-                "cloudinary_url": final_url,
-                "status_code": response.status_code
-            }), 500
+        # ส่ง SVG กลับไป (ทำงานได้แน่นอน)
+        return send_file(
+            BytesIO(svg_content.encode('utf-8')),
+            mimetype='image/svg+xml',
+            as_attachment=True,
+            download_name='result.svg'
+        )
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/cloudinary-url', methods=['POST'])
-def get_cloudinary_url():
-    """สร้าง Cloudinary URL สำหรับ n8n หรือการใช้งานอื่นๆ"""
+@app.route('/html-preview', methods=['POST'])
+def html_preview():
+    """สร้าง HTML preview"""
     try:
         data = request.get_json()
         
-        img_url = data.get('img_url')
-        text = data.get('text', 'Hello')
-        x = int(data.get('x', 0))
-        y = int(data.get('y', 0))
+        img_url = data.get('img_url', 'https://picsum.photos/800/600')
+        text = data.get('text', 'ทดสอบ')
+        x = int(data.get('x', 100))
+        y = int(data.get('y', 100))
         font_size = int(data.get('font_size', 48))
-        color = data.get('font_color', '#FFFFFF').replace('#', '')
-        align = data.get('align', 'center')
-        valign = data.get('valign', 'middle')
+        color = data.get('font_color', '#FFFFFF')
         
-        if not img_url:
-            return jsonify({"error": "img_url is required"}), 400
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+            <style>
+                body {{ margin: 0; font-family: 'Noto Sans Thai', sans-serif; }}
+                .container {{
+                    width: 800px;
+                    height: 600px;
+                    position: relative;
+                    background: url('{img_url}') center/cover;
+                }}
+                .text {{
+                    position: absolute;
+                    left: {x}px;
+                    top: {y}px;
+                    color: {color};
+                    font-size: {font_size}px;
+                    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="text">{text}</div>
+            </div>
+            <p>ถ้าเห็นข้อความภาษาไทยด้านบน แสดงว่าระบบทำงานปกติ</p>
+        </body>
+        </html>
+        """
         
-        # แปลง alignment
-        gravity_map = {
-            ('left', 'top'): 'north_west',
-            ('center', 'top'): 'north',
-            ('right', 'top'): 'north_east',
-            ('left', 'middle'): 'west',
-            ('center', 'middle'): 'center',
-            ('right', 'middle'): 'east',
-            ('left', 'bottom'): 'south_west',
-            ('center', 'bottom'): 'south',
-            ('right', 'bottom'): 'south_east'
-        }
-        gravity = gravity_map.get((align, valign), 'center')
+        return send_file(
+            BytesIO(html.encode('utf-8')),
+            mimetype='text/html',
+            as_attachment=False,
+            download_name='preview.html'
+        )
         
-        # สร้าง text overlay
-        text_overlay = f"l_text:Noto Sans Thai_{font_size}:{urllib.parse.quote(text)},co_rgb:{color},g_{gravity},x_{x},y_{y}"
-        
-        # สร้าง URL
-        base_url = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/fetch"
-        final_url = f"{base_url}/{text_overlay}/{urllib.parse.quote(img_url)}"
-        
-        return jsonify({
-            "success": True,
-            "cloudinary_url": final_url,
-            "direct_download": f"{final_url}?dl=true",
-            "parameters": {
-                "text": text,
-                "position": f"{align} {valign}",
-                "offset": f"x:{x}, y:{y}",
-                "font_size": font_size,
-                "color": f"#{color}"
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/upload-and-transform', methods=['POST'])
-def upload_and_transform():
-    """อัพโหลดรูปไป Cloudinary แล้วใส่ข้อความ (ต้องมี API credentials)"""
-    if not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
-        return jsonify({
-            "error": "Cloudinary API credentials not configured",
-            "info": "Please set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET environment variables"
-        }), 400
-    
-    try:
-        data = request.get_json()
-        img_url = data.get('img_url')
-        text = data.get('text', 'Hello')
-        
-        if not img_url:
-            return jsonify({"error": "img_url is required"}), 400
-        
-        # Upload to Cloudinary
-        upload_url = f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/image/upload"
-        
-        # สร้าง transformation
-        transformation = f"l_text:Noto Sans Thai_48:{urllib.parse.quote(text)},co_rgb:FFFFFF,g_center"
-        
-        # Upload parameters
-        params = {
-            'file': img_url,
-            'upload_preset': 'unsigned',  # ต้องสร้าง unsigned preset ใน Cloudinary dashboard
-            'transformation': transformation
-        }
-        
-        # Basic auth
-        auth = (CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET)
-        
-        response = requests.post(upload_url, data=params, auth=auth)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return jsonify({
-                "success": True,
-                "url": result['secure_url'],
-                "public_id": result['public_id']
-            })
-        else:
-            return jsonify({"error": "Upload failed", "details": response.text}), 500
-            
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
