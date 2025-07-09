@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทดสอบ Thai Text API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 30px;
+            text-align: center;
+        }
+        #result img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            color: red;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 5px;
+        }
+        .info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ ทดสอบ Thai Text API</h1>
+        
+        <div class="info">
+            ⚠️ อย่าลืมเปลี่ยน YOUR-API-URL เป็น URL จริงของคุณ!<br>
+            ตัวอย่าง: https://gracious-reprieve-production.up.railway.app
+        </div>
+
+        <div class="form-group">
+            <label for="apiUrl">API URL ของคุณ:</label>
+            <input type="text" id="apiUrl" placeholder="https://your-app.up.railway.app" value="">
+        </div>
+
+        <div class="form-group">
+            <label for="imgUrl">URL รูปภาพ:</label>
+            <input type="text" id="imgUrl" value="https://picsum.photos/800/600">
+        </div>
+
+        <div class="form-group">
+            <label for="text">ข้อความ:</label>
+            <textarea id="text">สวัสดีครับ
+Hello World
+ทดสอบภาษาไทย</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="x">ตำแหน่ง X:</label>
+            <input type="number" id="x" value="50">
+        </div>
+
+        <div class="form-group">
+            <label for="y">ตำแหน่ง Y:</label>
+            <input type="number" id="y" value="100">
+        </div>
+
+        <button onclick="testAPI()" id="testBtn">🚀 ทดสอบ API</button>
+
+        <div id="loading">
+            <div class="spinner"></div>
+            <p>กำลังประมวลผล...</p>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            if (!apiUrl) {
+                alert('กรุณาใส่ API URL ของคุณ');
+                return;
+            }
+
+            const testBtn = document.getElementById('testBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+
+            // Clear previous results
+            result.innerHTML = '';
+            
+            // Show loading
+            testBtn.disabled = true;
+            loading.style.display = 'block';
+
+            const data = {
+                img_url: document.getElementById('imgUrl').value,
+                text: document.getElementById('text').value,
+                x: parseInt(document.getElementById('x').value),
+                y: parseInt(document.getElementById('y').value)
+            };
+
+            try {
+                const response = await fetch(`${apiUrl}/text-on-image`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const imageUrl = URL.createObjectURL(blob);
+                    result.innerHTML = `
+                        <h2>✅ สำเร็จ!</h2>
+                        <img src="${imageUrl}" alt="Result">
+                        <p style="margin-top: 10px; color: #666;">
+                            คลิกขวาที่รูปแล้วเลือก "Save image as..." เพื่อบันทึก
+                        </p>
+                    `;
+                } else {
+                    const error = await response.text();
+                    result.innerHTML = `<div class="error">❌ Error: ${error}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ ไม่สามารถเชื่อมต่อ API<br>${error.message}</div>`;
+            } finally {
+                testBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Save API URL to localStorage
+        document.getElementById('apiUrl').addEventListener('change', function() {
+            localStorage.setItem('apiUrl', this.value);
+        });
+
+        // Load saved API URL
+        window.onload = function() {
+            const savedUrl = localStorage.getItem('apiUrl');
+            if (savedUrl) {
+                document.getElementById('apiUrl').value = savedUrl;
+            }
+        };
+    </script>
+</body>
+</html>
