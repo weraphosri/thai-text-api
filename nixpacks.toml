@@ -1,7 +1,5 @@
-cat > nixpacks.toml << 'EOF'
 [phases.setup]
 nixPkgs = ["...", "fontconfig", "freetype", "harfbuzz", "fribidi", "libraqm"]
 
-[phases.install] 
+[phases.install]
 nixPkgs = ["...", "noto-fonts", "noto-fonts-cjk-sans", "noto-fonts-emoji"]
-EOF

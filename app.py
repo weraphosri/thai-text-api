@@ -7,37 +7,29 @@ from io import BytesIO
 app = Flask(__name__)
 
 def get_thai_font(size=48):
-    """หาฟอนต์ไทยจาก Noto fonts"""
+    """หาฟอนต์ไทยที่ดีที่สุด"""
     font_paths = [
-        # Noto fonts ใน Nixpacks
-        '/nix/store/*/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
-        '/nix/store/*/share/fonts/truetype/noto/NotoSansThai-Bold.ttf',
-        
-        # System fonts fallback
-        '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
         '/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf',
+        '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
+        '/usr/share/fonts/truetype/thai-tlwg/Garuda-Bold.ttf',
         '/usr/share/fonts/truetype/thai-tlwg/Garuda.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
     ]
     
-    # ใช้ glob เพื่อหา Nix store paths
-    import glob
-    for pattern in font_paths:
-        if '*' in pattern:
-            matches = glob.glob(pattern)
-            if matches:
-                font_paths.extend(matches)
-        elif os.path.exists(pattern):
+    for font_path in font_paths:
+        if os.path.exists(font_path):
             try:
-                return ImageFont.truetype(pattern, size)
-            except:
+                return ImageFont.truetype(font_path, size)
+            except Exception as e:
+                print(f"Failed to load {font_path}: {e}")
                 continue
     
-    # ใช้ default font
+    # Default font
     return ImageFont.load_default()
 
 def has_raqm():
-    """ตรวจสอบว่ามี RAQM support"""
+    """ตรวจสอบ RAQM support"""
     try:
         return features.check_feature('raqm')
     except:
@@ -47,16 +39,30 @@ def has_raqm():
 def home():
     raqm_status = "✅ RAQM available" if has_raqm() else "❌ RAQM not available"
     
+    # ตรวจสอบฟอนต์ไทย
+    font_files = [
+        '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
+        '/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf'
+    ]
+    
+    font_status = []
+    for font_file in font_files:
+        if os.path.exists(font_file):
+            font_status.append(f"✅ {os.path.basename(font_file)}")
+        else:
+            font_status.append(f"❌ {os.path.basename(font_file)}")
+    
     return jsonify({
-        "status": "Thai Text API with Nixpacks ✅",
+        "status": "Thai Text API Final Version ✅",
         "raqm_support": raqm_status,
-        "info": "Uses Noto fonts with RAQM for proper Thai rendering"
+        "fonts": font_status,
+        "info": "With Dockerfile for guaranteed Thai support"
     })
 
 @app.route('/test')
 def test():
     """ทดสอบการแสดงผลภาษาไทย"""
-    img = Image.new('RGB', (800, 400), '#673AB7')
+    img = Image.new('RGB', (800, 400), '#1976D2')
     draw = ImageDraw.Draw(img)
     
     # ข้อความทดสอบ
@@ -81,7 +87,7 @@ def test():
             y_pos += 60
         
         # แสดงสถานะ
-        draw.text((50, 320), "✅ RAQM + Noto Thai Font: Perfect rendering!", 
+        draw.text((50, 320), "✅ RAQM + Noto Thai: Perfect Thai rendering!", 
                  font=small_font, fill='#4CAF50')
     else:
         # Fallback แบบง่าย
@@ -91,7 +97,7 @@ def test():
             draw.text((50, y_pos), line, font=font, fill='white')
             y_pos += 60
         
-        draw.text((50, 320), "⚠️ No RAQM: Basic rendering only", 
+        draw.text((50, 320), "⚠️ No RAQM: May have rendering issues", 
                  font=small_font, fill='#FF9800')
     
     img_io = BytesIO()
