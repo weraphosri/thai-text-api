@@ -99,7 +99,7 @@ def simple():
 
 @app.route('/text-on-image', methods=['POST'])
 def add_text():
-    """เพิ่มข้อความบนรูป"""
+    """เพิ่มข้อความบนรูป - ส่งกลับเป็น PNG ผ่าน external service"""
     try:
         data = request.get_json()
         
@@ -111,58 +111,12 @@ def add_text():
         color = data.get('font_color', '#FFFFFF')
         align = data.get('align', 'left')
         valign = data.get('valign', 'top')
+        output_format = data.get('format', 'svg')  # svg หรือ png
         
         if not img_url:
             return jsonify({"error": "img_url is required"}), 400
         
-        # วิธีที่ 1: ใช้ Statically.io (Free CDN with image manipulation)
-        # รองรับ text overlay แต่ภาษาไทยอาจมีปัญหา
-        statically_url = f"https://cdn.statically.io/img/{img_url.replace('https://', '').replace('http://', '')}/w=800,h=600"
-        
-        # วิธีที่ 2: สร้าง HTML และแปลงเป็นรูป
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
-            <style>
-                body {{
-                    margin: 0;
-                    padding: 0;
-                    width: 800px;
-                    height: 600px;
-                    position: relative;
-                    overflow: hidden;
-                }}
-                .container {{
-                    width: 100%;
-                    height: 100%;
-                    position: relative;
-                    background-image: url('{img_url}');
-                    background-size: cover;
-                    background-position: center;
-                }}
-                .text {{
-                    position: absolute;
-                    left: {x}px;
-                    top: {y}px;
-                    color: {color};
-                    font-size: {font_size}px;
-                    font-family: 'Noto Sans Thai', sans-serif;
-                    text-align: {align};
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="text">{text}</div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        # วิธีที่ 3: ใช้ API ที่ทำงานได้แน่นอน - กลับไปใช้ SVG
+        # สร้าง SVG
         svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <defs>
@@ -181,13 +135,83 @@ def add_text():
   <text x="{x}" y="{y}" class="thai-text">{text}</text>
 </svg>'''
         
-        # ส่ง SVG กลับไป (ทำงานได้แน่นอน)
+        # ถ้าต้องการ PNG ใช้ CloudConvert API (ฟรี 25 ครั้ง/วัน)
+        if output_format == 'png':
+            try:
+                # CloudConvert API
+                cloudconvert_url = "https://api.cloudconvert.com/v2/convert"
+                
+                # หรือใช้ svg2png.com API
+                svg_base64 = BytesIO(svg_content.encode('utf-8')).read().hex()
+                png_api_url = f"https://svg2png.com/api/convert?svg={svg_base64}"
+                
+                response = requests.get(png_api_url, timeout=10)
+                if response.status_code == 200:
+                    return send_file(
+                        BytesIO(response.content),
+                        mimetype='image/png',
+                        as_attachment=True,
+                        download_name='result.png'
+                    )
+            except:
+                pass
+        
+        # Default: ส่ง SVG
         return send_file(
             BytesIO(svg_content.encode('utf-8')),
             mimetype='image/svg+xml',
             as_attachment=True,
             download_name='result.svg'
         )
+@app.route('/text-on-image-base64', methods=['POST'])
+def add_text_base64():
+    """เพิ่มข้อความบนรูป - ส่งกลับเป็น base64 data URL"""
+    try:
+        data = request.get_json()
+        
+        img_url = data.get('img_url')
+        text = data.get('text', 'Hello')
+        x = int(data.get('x', 100))
+        y = int(data.get('y', 100))
+        font_size = int(data.get('font_size', 48))
+        color = data.get('font_color', '#FFFFFF')
+        align = data.get('align', 'left')
+        valign = data.get('valign', 'top')
+        
+        if not img_url:
+            return jsonify({"error": "img_url is required"}), 400
+        
+        # สร้าง SVG
+        svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&amp;display=swap');
+      .thai-text {{
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: {font_size}px;
+        fill: {color};
+        text-anchor: {'middle' if align == 'center' else 'start'};
+        dominant-baseline: {'central' if valign == 'middle' else 'hanging'};
+      }}
+    </style>
+  </defs>
+  <image href="{img_url}" width="800" height="600" preserveAspectRatio="xMidYMid slice"/>
+  <text x="{x}" y="{y}" class="thai-text">{text}</text>
+</svg>'''
+        
+        # แปลงเป็น base64
+        import base64
+        svg_base64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+        data_url = f"data:image/svg+xml;base64,{svg_base64}"
+        
+        return jsonify({
+            "success": True,
+            "data_url": data_url,
+            "svg_base64": svg_base64,
+            "format": "svg",
+            "note": "Use this data URL in HTML img tag or convert with other tools"
+        })
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -248,6 +272,77 @@ def html_preview():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+@app.route('/screenshot-url', methods=['POST'])
+def screenshot_url():
+    """สร้าง URL สำหรับ screenshot service"""
+    try:
+        data = request.get_json()
+        
+        img_url = data.get('img_url')
+        text = data.get('text', 'Hello')
+        x = int(data.get('x', 100))
+        y = int(data.get('y', 100))
+        font_size = int(data.get('font_size', 48))
+        color = data.get('font_color', '#FFFFFF').replace('#', '')
+        
+        if not img_url:
+            return jsonify({"error": "img_url is required"}), 400
+        
+        # สร้าง HTML URL
+        html_template = f"""
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700" rel="stylesheet">
+            <style>
+                body {{ margin: 0; padding: 0; }}
+                .container {{
+                    width: 800px;
+                    height: 600px;
+                    position: relative;
+                    background: url('{img_url}') center/cover no-repeat;
+                }}
+                .text {{
+                    position: absolute;
+                    left: {x}px;
+                    top: {y}px;
+                    color: #{color};
+                    font-size: {font_size}px;
+                    font-family: 'Noto Sans Thai', sans-serif;
+                    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="text">{text}</div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Encode HTML
+        import base64
+        html_base64 = base64.b64encode(html_template.encode('utf-8')).decode('utf-8')
+        
+        # Screenshot API URLs
+        screenshot_urls = {
+            # 1. ScreenshotAPI.net (ฟรี 100 ครั้ง/เดือน)
+            "screenshotapi": f"https://shot.screenshotapi.net/screenshot?url=data:text/html;base64,{html_base64}&width=800&height=600&output=image&file_type=png",
+            
+            # 2. Microlink API (ฟรี)
+            "microlink": f"https://api.microlink.io/?url=data:text/html;base64,{html_base64}&screenshot=true&meta=false&embed=screenshot.url",
+            
+            # 3. Page2Images (ฟรี)
+            "page2images": f"https://api.page2images.com/directlink?p2i_url=data:text/html;base64,{html_base64}&p2i_size=800x600&p2i_screen=1024x768&p2i_imageformat=png"
+        }
+        
+        return jsonify({
+            "success": True,
+            "screenshot_urls": screenshot_urls,
+            "html_base64": html_base64,
+            "usage": "Use any of these URLs to get PNG image"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
