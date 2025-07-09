@@ -98,6 +98,7 @@ def add_text():
         y = int(data.get('y', 50))
         font_size = int(data.get('font_size', 48))
         color = data.get('font_color', '#FFFFFF')
+        language = data.get('language', 'th')  # Default เป็นภาษาไทย
         
         if not img_url:
             return jsonify({"error": "ต้องมี img_url"}), 400
@@ -121,7 +122,7 @@ def add_text():
                     line, 
                     font=font, 
                     fill=color,
-                    language='th',  # ระบุเป็นภาษาไทย
+                    language=language,  # ใช้ภาษาที่ผู้ใช้ระบุ
                     direction='ltr'
                 )
         else:
