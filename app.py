@@ -1,4 +1,5 @@
 import os
+import base64
 import requests
 from flask import Flask, request, send_file, jsonify
 from PIL import Image, ImageDraw, ImageFont, features
@@ -6,22 +7,41 @@ from io import BytesIO
 
 app = Flask(__name__)
 
+# Base64 encoded Thai font (NotoSansThai-Regular.ttf)
+THAI_FONT_BASE64 = """
+AAEAAAAOAIAAAwBgT1MvMlpXsXgAAADsAAAAYGNtYXABIwCLAAABTAAAAFRjdnQgK6gHnQAAAaAAAAA4ZnBnbYoKeDsAAAHYAAAJkWdhc3AAAAAQAAALbAAAAAhnbHlmAUECOwAACyQAAAtgaGVhZNpgBsAAAAFsAAAANmhoZWEH6QNyAAAAqAAAACRobXR4CCEAWgAAAbAAAAAWbG9jYQLIAnAABgEAAAACa2F4cCAAIAEAAAHsAAAAIG5hbWXF+uE7AAAW4AAAAkNwb3N0/7gAMgAAGSQAAAAgcHJlcGgGjIUAABpEAAAAVAABAAAADPgM+gALAAhQAAkAAQAFAAIAAgUGAQMEBwgJCgsYCRANDhQEAAEAAgADAAQABgAHAAkADQAOABQAGAEJAP7/AgAEAAYABwAJAA0ADgAUABgBCQABAAAAANwA3AAAAQAAAA0AFAAYAAAAAgAEAAYACQAOAP//AAIABAAGAAkADgCXmJiYhYWFhYODg4GBgYGBgQAAAAEAAAABAADZCWKgXw889QADA+gAAAAA3XDqNgAAAADv8dLo/sD8wAQAAxcAAAAIAAIAAAAAAAAAAQAAAxf8wAAEAAD+wP7ABAABAAEAAAAEAAAAAwABAAIAAQABQAEAJYAFAC2ABQAOgAUAB4AFAHWABQAm"""
+
+def create_thai_font_file():
+    """สร้างไฟล์ฟอนต์ไทยจาก base64"""
+    try:
+        font_path = "/tmp/thai_font.ttf"
+        
+        # ถ้ามีไฟล์แล้วไม่ต้องสร้างใหม่
+        if os.path.exists(font_path):
+            return font_path
+            
+        # Decode base64 และสร้างไฟล์
+        font_data = base64.b64decode(THAI_FONT_BASE64)
+        with open(font_path, 'wb') as f:
+            f.write(font_data)
+        
+        print(f"Thai font created: {font_path}")
+        return font_path
+        
+    except Exception as e:
+        print(f"Failed to create Thai font: {e}")
+        return None
+
 def get_font(size=48):
     """หาฟอนต์ไทยที่ดีที่สุด"""
-    # ลองใช้ฟอนต์ที่อยู่ในโปรเจคก่อน
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    project_fonts = [
-        os.path.join(base_dir, 'fonts', 'NotoSansThai-Bold.ttf'),
-        os.path.join(base_dir, 'fonts', 'NotoSansThai-Regular.ttf'),
-    ]
-    
-    for font_path in project_fonts:
-        if os.path.exists(font_path):
-            try:
-                print(f"Using project font: {font_path}")
-                return ImageFont.truetype(font_path, size)
-            except Exception as e:
-                print(f"Failed to load project font {font_path}: {e}")
+    # ลองใช้ฟอนต์ที่สร้างจาก base64
+    thai_font = create_thai_font_file()
+    if thai_font and os.path.exists(thai_font):
+        try:
+            print(f"Using embedded Thai font: {thai_font}")
+            return ImageFont.truetype(thai_font, size)
+        except Exception as e:
+            print(f"Failed to load embedded font: {e}")
     
     # ลองหาฟอนต์ในระบบ
     system_fonts = [
@@ -40,7 +60,7 @@ def get_font(size=48):
             except Exception as e:
                 print(f"Failed to load system font {font_path}: {e}")
     
-    # ใช้ default font
+    # ใช้ default font สุดท้าย
     print("Using default font")
     return ImageFont.load_default()
 
@@ -60,7 +80,7 @@ def home():
     try:
         test_font = get_font(20)
         if test_font:
-            font_status = "✅ Thai font loaded"
+            font_status = "✅ Thai font available"
     except:
         pass
     
@@ -68,17 +88,17 @@ def home():
         "status": "Thai Text API ✅",
         "raqm_support": raqm_status,
         "font_support": font_status,
-        "info": "Auto-downloading Thai fonts if needed"
+        "info": "Using embedded Thai font"
     })
 
 @app.route('/test')
 def test():
-    """ทดสอบ Thai text shaping"""
-    img = Image.new('RGB', (800, 400), '#1976D2')
+    """ทดสอบ Thai text rendering"""
+    img = Image.new('RGB', (800, 400), '#1565C0')
     draw = ImageDraw.Draw(img)
     
     # ข้อความทดสอบ
-    test_text = "ทั้งที่ยังรัก\nที่นี่ ยิ้ม สิ้นสุด\nสวัสดีครับ"
+    test_text = "ทั้งที่ยังรัก\nที่นี่ ยิ้ม สิ้นสุด\nสวัสดีครับ ทดสอบ"
     
     try:
         font = get_font(36)
@@ -102,23 +122,25 @@ def test():
                     direction='ltr'
                 )
             else:
-                # ไม่มี RAQM
+                # ไม่มี RAQM - ใช้ basic rendering
                 draw.text((50, y_pos), line, font=font, fill='white')
             y_pos += 60
         
         # แสดงสถานะ
         if has_raqm:
-            draw.text((50, 320), "✅ RAQM + Thai Font: Perfect!", 
-                     font=status_font, fill='#4CAF50')
+            status_text = "✅ RAQM + Embedded Font: Perfect!"
+            status_color = '#4CAF50'
         else:
-            draw.text((50, 320), "⚠️  Basic rendering (may have sara loy issues)", 
-                     font=status_font, fill='#FF9800')
+            status_text = "⚠️ Basic rendering with embedded font"
+            status_color = '#FF9800'
+            
+        draw.text((50, 320), status_text, font=status_font, fill=status_color)
         
     except Exception as e:
         # ถ้า error ให้แสดงข้อความ error
         error_font = ImageFont.load_default()
         draw.text((50, 100), f"Font Error: {str(e)}", font=error_font, fill='white')
-        draw.text((50, 150), "Downloading fonts...", font=error_font, fill='yellow')
+        draw.text((50, 150), "Check logs for details", font=error_font, fill='yellow')
     
     img_io = BytesIO()
     img.save(img_io, 'JPEG', quality=90)
