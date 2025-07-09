@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     build-essential \
     curl \
+    fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
 # ดาวน์โหลดและติดตั้ง Noto Thai fonts
