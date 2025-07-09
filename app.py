@@ -4,6 +4,7 @@ from io import BytesIO
 import requests
 import urllib.parse
 import json
+import base64
 
 app = Flask(__name__)
 
@@ -15,7 +16,9 @@ def home():
         "endpoints": {
             "/text-on-image": "POST - Add Thai text to image",
             "/test": "GET - Test Thai rendering",
-            "/simple": "GET - Simple text image"
+            "/simple": "GET - Simple text image",
+            "/get-html": "POST - Get HTML for n8n HTML to Image node",
+            "/get-html-raw": "POST - Get raw HTML"
         }
     })
 
@@ -163,6 +166,9 @@ def add_text():
             as_attachment=True,
             download_name='result.svg'
         )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/text-on-image-base64', methods=['POST'])
 def add_text_base64():
     """เพิ่มข้อความบนรูป - ส่งกลับเป็น base64 data URL"""
@@ -201,7 +207,6 @@ def add_text_base64():
 </svg>'''
         
         # แปลงเป็น base64
-        import base64
         svg_base64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
         data_url = f"data:image/svg+xml;base64,{svg_base64}"
         
@@ -322,7 +327,6 @@ def screenshot_url():
         """
         
         # Encode HTML
-        import base64
         html_base64 = base64.b64encode(html_template.encode('utf-8')).decode('utf-8')
         
         # Screenshot API URLs
@@ -346,3 +350,150 @@ def screenshot_url():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/get-html', methods=['POST'])
+def get_html():
+    """สร้าง HTML สำหรับ HTML to Image node ใน n8n"""
+    try:
+        data = request.get_json()
+        
+        img_url = data.get('img_url')
+        text = data.get('text', 'Hello')
+        x = int(data.get('x', 100))
+        y = int(data.get('y', 100))
+        font_size = int(data.get('font_size', 48))
+        color = data.get('font_color', '#FFFFFF')
+        align = data.get('align', 'left')
+        valign = data.get('valign', 'top')
+        
+        if not img_url:
+            return jsonify({"error": "img_url is required"}), 400
+        
+        # แปลง alignment
+        text_align = align
+        vertical_align = valign
+        
+        # สร้าง HTML ที่สมบูรณ์
+        html = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=800">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            width: 800px;
+            height: 600px;
+            font-family: 'Noto Sans Thai', sans-serif;
+            overflow: hidden;
+        }}
+        .container {{
+            width: 800px;
+            height: 600px;
+            position: relative;
+            background-image: url('{img_url}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }}
+        .text {{
+            position: absolute;
+            left: {x}px;
+            top: {y}px;
+            color: {color};
+            font-size: {font_size}px;
+            font-weight: 400;
+            text-align: {text_align};
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            white-space: pre-wrap;
+        }}
+        .text.middle {{
+            transform: translateY(-50%);
+            top: {y}px;
+        }}
+        .text.bottom {{
+            transform: translateY(-100%);
+            top: {y}px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text {valign}">{text}</div>
+    </div>
+</body>
+</html>'''
+        
+        return jsonify({
+            "success": True,
+            "html": html,
+            "note": "Use this HTML in n8n HTML to Image node"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get-html-raw', methods=['POST'])
+def get_html_raw():
+    """ส่ง HTML โดยตรง (ไม่ใช่ JSON)"""
+    try:
+        data = request.get_json()
+        
+        img_url = data.get('img_url')
+        text = data.get('text', 'Hello')
+        x = int(data.get('x', 100))
+        y = int(data.get('y', 100))
+        font_size = int(data.get('font_size', 48))
+        color = data.get('font_color', '#FFFFFF')
+        
+        if not img_url:
+            return "Error: img_url is required", 400
+        
+        html = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {{
+            margin: 0;
+            width: 800px;
+            height: 600px;
+            font-family: 'Noto Sans Thai', sans-serif;
+        }}
+        .container {{
+            width: 800px;
+            height: 600px;
+            position: relative;
+            background: url('{img_url}') center/cover no-repeat;
+        }}
+        .text {{
+            position: absolute;
+            left: {x}px;
+            top: {y}px;
+            color: {color};
+            font-size: {font_size}px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text">{text}</div>
+    </div>
+</body>
+</html>'''
+        
+        return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
+        
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
