@@ -8,9 +8,9 @@ import base64
 app = Flask(__name__)
 
 # Cloudinary configuration
-CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME', 'demo')  # ใส่ cloud name ของคุณ
-CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY', '')  # ถ้าต้องการ upload
-CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', '')  # ถ้าต้องการ upload
+CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME', 'dtuz1nors')
+CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY', '992211531151382')
+CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', 'gRAksjdUhdLW_LIjgYBeZNwtPd4')
 
 @app.route('/')
 def home():
