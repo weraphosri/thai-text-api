@@ -66,6 +66,16 @@ def add_text():
         if not img_url:
             return jsonify({"error": "img_url is required"}), 400
         
+        # แปลง Google Drive URL
+        if 'drive.google.com' in img_url:
+            # ดึง file ID
+            if 'id=' in img_url:
+                file_id = img_url.split('id=')[1].split('&')[0]
+                img_url = f"https://lh3.googleusercontent.com/d/{file_id}"
+            elif '/d/' in img_url:
+                file_id = img_url.split('/d/')[1].split('/')[0]
+                img_url = f"https://lh3.googleusercontent.com/d/{file_id}"
+        
         # จัดการ text alignment
         text_anchor = 'start'  # default
         if align == 'center':
